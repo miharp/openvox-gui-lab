@@ -90,7 +90,9 @@ deploy.
 
 ## How the pieces fit
 
-- **Console** — `profile::console`. Agent only. Installs the GUI with the
+- **Console** — `profile::console`. Agent only. Installs the GUI (the
+  3.12.1 dev train: 3.12.0's installer cannot use EL9's python3.12, see
+  `data/common.yaml`) with the
   [miharp/openvox_gui](https://github.com/miharp/puppet-openvox_gui) module:
   `puppet_server_host` is the compiler, `puppetdb_host` is `ovdb.example.com`,
   `PUPPET_CA_HOST` is `ovca.example.com`. `configure_bolt` creates the
