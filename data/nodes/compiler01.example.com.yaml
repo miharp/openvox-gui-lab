@@ -1,0 +1,3 @@
+---
+# The compiler. Its OpenVoxDB target (ovdb.example.com) and control-repo
+# remote are profile::compiler defaults; override here to experiment.

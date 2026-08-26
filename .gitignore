@@ -1,0 +1,5 @@
+# r10k installs Puppetfile modules here.
+modules/
+.vagrant/
+# Onceover builds a throwaway copy of this repo here.
+.onceover/

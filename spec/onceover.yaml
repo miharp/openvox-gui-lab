@@ -1,0 +1,50 @@
+# Onceover compiles each role against a node factset (real EL9 facts captured
+# from codavox-lab VMs; console's derived from agent01's).
+#
+# It proves a role is valid. It does NOT prove any node is classified into it —
+# manifests/site.pp owns that, and the two have to be kept in agreement by hand.
+classes:
+  - role::primary
+  - role::compiler
+  - role::console
+  - role::agent
+
+nodes:
+  - puppet.example.com
+  - compiler01.example.com
+  - console.example.com
+  - agent01.example.com
+
+class_groups:
+  primary_role:
+    - role::primary
+  compiler_role:
+    - role::compiler
+  console_role:
+    - role::console
+  agent_role:
+    - role::agent
+
+node_groups:
+  primary:
+    - puppet.example.com
+  compilers:
+    - compiler01.example.com
+  consoles:
+    - console.example.com
+  agents:
+    - agent01.example.com
+
+test_matrix:
+  - primary:
+      classes: primary_role
+      tests: spec
+  - compilers:
+      classes: compiler_role
+      tests: spec
+  - consoles:
+      classes: console_role
+      tests: spec
+  - agents:
+      classes: agent_role
+      tests: spec

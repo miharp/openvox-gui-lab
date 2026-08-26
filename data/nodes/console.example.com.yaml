@@ -1,0 +1,3 @@
+---
+# The dedicated console. GUI version and admin password are in common.yaml;
+# backend hostnames are profile::console defaults (compiler01, ovdb, ovca).

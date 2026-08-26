@@ -1,0 +1,19 @@
+#!/bin/bash
+# Deploy the committed control repo out of band, with r10k on each server.
+#
+# The in-band way is the GUI: Code Deployment > Stage, then Activate, runs
+# r10k on the compiler over Bolt. This script is for when you want the same
+# result without the GUI in the loop (or to see what the GUI should have done).
+#
+# r10k deploys committed branches; uncommitted edits are invisible here.
+set -euo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "warning: uncommitted changes will NOT be deployed." >&2
+fi
+
+for n in puppet compiler01; do
+  echo "==> r10k deploy environment production on $n"
+  vagrant ssh "$n" -c 'sudo /opt/puppetlabs/puppet/bin/r10k deploy environment production -v -p' 2>/dev/null | tr -d '\r'
+done

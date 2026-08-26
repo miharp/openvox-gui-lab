@@ -1,0 +1,25 @@
+#!/bin/bash
+# Run the agent once on every node, in dependency order.
+#
+# The agent is left disabled on every node so nothing runs in the middle of
+# an observation. Bring-up leaves one known gap that a second pass closes:
+# the compiler enrols before the console exists, so it gets its bolt user
+# (the console's key, collected from OpenVoxDB) only on its next run.
+#
+#   ./scripts/converge              # all nodes
+#   ./scripts/converge compiler01   # one node
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+nodes=("$@")
+[ ${#nodes[@]} -gt 0 ] || nodes=(puppet compiler01 console agent01)
+
+rc=0
+for n in "${nodes[@]}"; do
+  echo "==> $n"
+  vagrant ssh "$n" -c 'sudo /opt/puppetlabs/bin/puppet agent -t --waitforlock 60' 2>/dev/null | tr -d '\r'
+  code=${PIPESTATUS[0]}
+  # 0 = no changes, 2 = changes applied; anything else is a failure.
+  case $code in 0|2) ;; *) echo "!! $n exited $code"; rc=1 ;; esac
+done
+exit $rc

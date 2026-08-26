@@ -1,0 +1,38 @@
+---
+# Version pins. Skew between an agent and the server it talks to produces
+# failures that look like code problems, so the lab pins rather than tracking
+# latest.
+profile::openvox_agent::version: '8.28.1'
+profile::openvox_server::version: '8.15.1'
+
+# OpenVox GUI release installed on the console (git tag without the 'v').
+profile::console::gui_version: '3.12.0'
+
+# Lab credentials, in plain YAML on purpose: there is nothing here worth
+# protecting, and eyaml would put PKCS7 keys between you and `vagrant up`.
+profile::console::admin_password: 'openvox-lab'
+
+# The console(s) allowed through the CA API and the servers' /status and
+# /metrics endpoints. The GUI authenticates with its agent certificate.
+profile::openvox_server::console_certnames:
+  - 'console.example.com'
+profile::primary::console_certnames: "%{alias('profile::openvox_server::console_certnames')}"
+
+# Written to /etc/openvox-gui-lab-marker on every node. Change it, commit,
+# Stage/Activate from the GUI (or scripts/deploy), run the agent, and watch
+# a code change travel through the estate.
+profile::base::marker_content: 'phase-1'
+
+# --- OpenVoxDB (primary) ---------------------------------------------------
+# The EL9 AppStream PostgreSQL, so no external repository is needed.
+openvoxdb::postgres_version: '13'
+openvoxdb::manage_package_repo: false
+openvoxdb::database::postgresql::manage_package_repo: false
+# Ports are opened during provisioning; puppetlabs/firewall stays unused.
+openvoxdb::manage_firewall: false
+# Reachable from the compiler and the console, by ovdb.example.com.
+openvoxdb::ssl_listen_address: '0.0.0.0'
+# The package default (-Xmx256m) is tight once the GUI starts querying.
+openvoxdb::java_args:
+  '-Xmx': '512m'
+  '-Xms': '256m'

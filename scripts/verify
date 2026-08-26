@@ -1,0 +1,62 @@
+#!/bin/bash
+# Check that the estate is what the GUI's clustered mode expects, from the
+# outside in: GUI health and login, cluster config and member health, fleet
+# count against OpenVoxDB, Bolt from the console to every target, and the
+# GUI's own cluster-preflight.
+#
+#   ./scripts/verify
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+PASS=0; FAIL=0
+ok()  { echo "PASS  $*"; PASS=$((PASS+1)); }
+bad() { echo "FAIL  $*"; FAIL=$((FAIL+1)); }
+on()  { vagrant ssh "$1" -c "$2" 2>/dev/null | tr -d '\r'; }
+
+ADMIN_PASSWORD=$(awk -F"'" '/^profile::console::admin_password:/ {print $2}' data/common.yaml)
+GUI=https://localhost:4567
+
+echo "== GUI"
+health=$(on console "curl -skf $GUI/health")
+[[ "$health" == *'"status":"ok"'* ]] && ok "/health: $health" || bad "/health: ${health:-no answer}"
+
+token=$(on console "curl -sk -X POST $GUI/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"$ADMIN_PASSWORD\"}'" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))' 2>/dev/null)
+[ -n "$token" ] && ok "admin login" || { bad "admin login"; }
+auth="-H 'Authorization: Bearer $token'"
+
+echo "== cluster"
+cluster=$(on console "curl -sk $auth $GUI/api/config/cluster")
+mode=$(printf '%s' "$cluster" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("deployment_mode",""))' 2>/dev/null)
+[ "$mode" = clustered ] && ok "deployment_mode=clustered" || bad "deployment_mode=${mode:-?} ($cluster)"
+
+chealth=$(on console "curl -sk $auth $GUI/api/config/cluster/health")
+printf '%s\n' "$chealth" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+def walk(o,path=""):
+    if isinstance(o,dict):
+        if "fqdn" in o and ("ok" in o or "healthy" in o or "status" in o):
+            st=o.get("ok",o.get("healthy",o.get("status")))
+            print(("PASS  " if st in (True,"ok","healthy") else "FAIL  ")+path+" "+o["fqdn"]+" -> "+str(st))
+        for k,v in o.items(): walk(v,path+"/"+k if isinstance(v,(dict,list)) else path)
+    elif isinstance(o,list):
+        for v in o: walk(v,path)
+walk(d)' 2>/dev/null || bad "cluster/health unparseable: $chealth"
+
+echo "== fleet"
+gui_nodes=$(on console "curl -sk $auth $GUI/api/nodes/" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null)
+pdb_nodes=$(on puppet "sudo curl -sk --cert /etc/puppetlabs/puppet/ssl/certs/puppet.example.com.pem --key /etc/puppetlabs/puppet/ssl/private_keys/puppet.example.com.pem --cacert /etc/puppetlabs/puppet/ssl/certs/ca.pem https://localhost:8081/pdb/query/v4/nodes" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null)
+if [ -n "$gui_nodes" ] && [ "$gui_nodes" = "$pdb_nodes" ]; then ok "GUI fleet ($gui_nodes) = OpenVoxDB /nodes ($pdb_nodes)"; else bad "GUI fleet (${gui_nodes:-?}) vs OpenVoxDB /nodes (${pdb_nodes:-?})"; fi
+
+echo "== bolt"
+bolt=$(on console "sudo -u bolt /opt/puppetlabs/bin/bolt command run 'sudo -n true' --targets compiler01.example.com,agent01.example.com,console.example.com --project /etc/puppetlabs/bolt --no-tty 2>&1 | tail -3")
+[[ "$bolt" == *"Successful on 3 targets"* ]] && ok "bolt@ reaches every target with sudo" || bad "bolt: $bolt"
+
+echo "== preflight"
+pre=$(on console "sudo /opt/openvox-gui/scripts/cluster-preflight.sh 2>&1 | tail -4")
+[[ "$pre" == *"result: PASS"* || "$pre" == *"OK"* && "$pre" != *"FAIL"* ]] && ok "cluster-preflight" || bad "cluster-preflight: $pre"
+
+echo
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

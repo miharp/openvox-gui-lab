@@ -1,0 +1,3 @@
+---
+# The primary: CA, OpenVoxDB, DNS. Estate-wide OpenVoxDB settings live in
+# common.yaml; this file exists so per-node overrides have an obvious home.
