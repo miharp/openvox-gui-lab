@@ -50,6 +50,10 @@ Vagrant.configure("2") do |config|
     192.168.58.13 agent01.example.com agent01
   HOSTS
 
+  # What dnsmasq answers with: the estate plus the round-robin names the GUI
+  # treats specially, ovdb.example.com (OpenVoxDB) and ovca.example.com (CA).
+  lab_hosts = hosts.sub(/^192\.168\.58\.10 .*$/) { |l| "#{l} ovdb.example.com ovdb ovca.example.com ovca" }
+
   # Common to every node: clock, curl, OpenVox repo.
   common = <<-SHELL
     set -euo pipefail
@@ -159,16 +163,22 @@ EOF
 #{hosts}
 EOF
 
-      # DNS for the estate. dnsmasq serves /etc/hosts plus the round-robin
-      # names; upstream queries follow this node's own resolv.conf.
+      # DNS for the estate. dnsmasq serves an explicit hosts file — not
+      # /etc/hosts, which carries Vagrant's own "127.0.1.1 puppet.example.com"
+      # line and would tell every node the primary lives at loopback (on the
+      # compiler that loopback address answers with the wrong certificate).
+      # The file lives outside /etc/dnsmasq.d, which dnsmasq reads as config.
+      # Upstream queries follow this node's own resolv.conf.
       dnf install -y -q dnsmasq
+      cat > /etc/openvox-gui-lab.hosts <<'EOF'
+#{lab_hosts}
+EOF
       cat > /etc/dnsmasq.d/openvox-gui-lab.conf <<'EOF'
 listen-address=#{primary_ip}
 bind-interfaces
 domain=example.com
-expand-hosts
-host-record=ovdb.example.com,#{primary_ip}
-host-record=ovca.example.com,#{primary_ip}
+no-hosts
+addn-hosts=/etc/openvox-gui-lab.hosts
 EOF
       systemctl enable --now dnsmasq
 
