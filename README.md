@@ -83,10 +83,11 @@ filled in.
 
 **Why `converge` after `up`:** the compiler enrols before the console exists.
 Its bolt user is created from the console's public key, collected from
-OpenVoxDB through the `openvox_gui_bolt_pubkey` fact, so it can only appear
-on a run after the console has reported. `converge` runs the agent once on
-every node in dependency order; it is also the way to apply any change you
-deploy.
+OpenVoxDB through the `openvox_gui_bolt_pubkey` fact — and a node uploads
+its facts at the *start* of a run, so the key reaches OpenVoxDB during the
+console's run and the compiler can only see it on a run after that.
+`converge` runs the agent on every node in that order (primary, console,
+compiler, agent); it is also the way to apply any change you deploy.
 
 ## How the pieces fit
 
