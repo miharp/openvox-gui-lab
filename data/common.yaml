@@ -3,7 +3,7 @@
 # failures that look like code problems, so the lab pins rather than tracking
 # latest.
 profile::openvox_agent::version: '8.28.1'
-profile::openvox_server::version: '8.15.1'
+profile::openvox_server::version: '8.15.2'
 
 # OpenVox GUI release installed on the console (git tag without the 'v').
 profile::console::gui_version: '3.12.0'
