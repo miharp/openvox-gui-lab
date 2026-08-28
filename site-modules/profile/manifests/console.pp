@@ -15,10 +15,22 @@
 # the fleet) so Settings > Cluster is already filled in on first login.
 # The GUI owns the file afterwards; Puppet never rewrites it.
 #
+# The GUI's own database is PostgreSQL on the primary, reached as
+# ovdb.example.com: clustered mode requires it (Settings > Cluster refuses
+# to save on SQLite), and the installer provisions role, database and
+# schema itself through its bootstrap-openvox-gui-db.sh, given a superuser
+# DSN and the app password.
+#
 # @param gui_version
 #   OpenVox GUI release to install.
 # @param admin_password
 #   Initial admin password.
+# @param gui_db_password
+#   Password of the openvox_gui database role the installer creates.
+# @param gui_db_admin_password
+#   Password of the superuser the installer connects as to create it.
+# @param gui_db_admin_user
+#   That superuser's name.
 # @param compiler
 #   Catalog compiler the GUI treats as its OpenVox Server.
 # @param puppetdb_host
@@ -32,6 +44,9 @@
 class profile::console (
   String[1] $gui_version,
   String[1] $admin_password,
+  String[1] $gui_db_password,
+  String[1] $gui_db_admin_password,
+  String[1] $gui_db_admin_user = 'openvox_gui_admin',
   Stdlib::Host $compiler = 'compiler01.example.com',
   Stdlib::Host $puppetdb_host = 'ovdb.example.com',
   Stdlib::Host $ca_host = 'ovca.example.com',
@@ -56,6 +71,11 @@ class profile::console (
     ensure => installed,
   }
 
+  # The installer's database bootstrap runs psql from here.
+  package { 'postgresql':
+    ensure => installed,
+  }
+
   class { 'openvox_gui':
     version             => $gui_version,
     admin_password      => Sensitive($admin_password),
@@ -64,10 +84,13 @@ class profile::console (
     configure_bolt      => true,
     dependency_packages => ['git', 'npm', 'diffutils', 'curl', 'openssh-clients'],
     extra_settings      => {
-      'PUPPET_CA_HOST' => $ca_host,
-      'PYTHON_BIN'     => '/usr/bin/python3.12',
+      'PUPPET_CA_HOST'              => $ca_host,
+      'PYTHON_BIN'                  => '/usr/bin/python3.12',
+      'OPENVOX_GUI_DB_BACKEND'      => 'postgresql',
+      'OPENVOX_GUI_DB_ADMIN_DSN'    => "postgresql://${gui_db_admin_user}:${gui_db_admin_password}@${puppetdb_host}:5432/postgres",
+      'OPENVOX_GUI_DB_APP_PASSWORD' => $gui_db_password,
     },
-    require             => Package['nodejs', 'openbolt', 'python3.12'],
+    require             => Package['nodejs', 'openbolt', 'python3.12', 'postgresql'],
   }
 
   $cluster = {
@@ -79,7 +102,7 @@ class profile::console (
     'ca_vips'             => [$ca_host],
     'dns_rr_vips'         => [$puppetdb_host],
     'consoles'            => [$facts['networking']['fqdn']],
-    'database_backend'    => 'sqlite',
+    'database_backend'    => 'postgresql',
   }
 
   file { '/opt/openvox-gui/data/cluster_config.json':

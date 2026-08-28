@@ -16,6 +16,14 @@ profile::console::gui_version: '3.12.1-dev.10'
 # protecting, and eyaml would put PKCS7 keys between you and `vagrant up`.
 profile::console::admin_password: 'openvox-lab'
 
+# The GUI's own database is PostgreSQL on the primary, in the instance
+# OpenVoxDB already uses (its runbook: one instance, two databases). The
+# installer provisions the role and database itself, connecting as a
+# superuser created for that purpose; the app password is what it sets.
+profile::primary::gui_db_admin_password: 'openvox-gui-admin'
+profile::console::gui_db_admin_password: "%{alias('profile::primary::gui_db_admin_password')}"
+profile::console::gui_db_password: 'openvox-gui-app'
+
 # The console(s) allowed through the CA API and the servers' /status and
 # /metrics endpoints. The GUI authenticates with its agent certificate.
 profile::openvox_server::console_certnames:
@@ -36,6 +44,9 @@ openvoxdb::database::postgresql::manage_package_repo: false
 openvoxdb::manage_firewall: false
 # Reachable from the compiler and the console, by ovdb.example.com.
 openvoxdb::ssl_listen_address: '0.0.0.0'
+# PostgreSQL itself listens on the network too: the GUI's database lives in
+# this instance and the console connects to it directly.
+openvoxdb::database::postgresql::listen_addresses: '*'
 # The package default (-Xmx256m) is tight once the GUI starts querying.
 openvoxdb::java_args:
   '-Xmx': '512m'

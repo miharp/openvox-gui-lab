@@ -205,6 +205,7 @@ EOF
       firewall-cmd --add-service=dns --permanent >/dev/null
       firewall-cmd --add-port=8140/tcp --permanent >/dev/null
       firewall-cmd --add-port=8081/tcp --permanent >/dev/null
+      firewall-cmd --add-port=5432/tcp --permanent >/dev/null
       firewall-cmd --reload >/dev/null
 
       systemctl enable --now puppetserver

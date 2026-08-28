@@ -10,11 +10,24 @@
 # stock auth.conf allows nobody there; the console certnames are allowed
 # ahead of the stock rule.
 #
+# The GUI's own database (openvox_gui) lives in the same PostgreSQL instance
+# as OpenVoxDB's, which is the layout the GUI's runbook prescribes. The
+# instance listens on the network (Hiera) and carries a superuser the GUI's
+# installer connects as, from the console, to create the role, database and
+# schema itself; that provisioning path is under test here, so nothing of
+# the database is declared on this side.
+#
+# @param gui_db_admin_password
+#   Password of the superuser the GUI's installer provisions its database as.
+# @param gui_db_admin_user
+#   That superuser's name.
 # @param console_certnames
 #   Certnames of the OpenVox GUI console(s) allowed to use the CA API.
 # @param auth_conf
 #   Path of puppetserver's auth.conf.
 class profile::primary (
+  String[1] $gui_db_admin_password,
+  String[1] $gui_db_admin_user = 'openvox_gui_admin',
   Array[String[1]] $console_certnames = [],
   Stdlib::Absolutepath $auth_conf = '/etc/puppetlabs/puppetserver/conf.d/auth.conf',
 ) {
@@ -31,6 +44,12 @@ class profile::primary (
     manage_report_processor => true,
     enable_reports          => true,
     require                 => Class['openvoxdb'],
+  }
+
+  postgresql::server::role { $gui_db_admin_user:
+    superuser     => true,
+    password_hash => postgresql::postgresql_password($gui_db_admin_user, $gui_db_admin_password, false, 'scram-sha-256'),
+    require       => Class['openvoxdb'],
   }
 
   unless $console_certnames.empty {
