@@ -160,6 +160,13 @@ it. Then:
 vagrant ssh agent01 -c 'cat /etc/openvox-gui-lab-enc-marker'
 ```
 
+(`compiler01` and `puppet` show as *Unclassified* here, although the
+page's banner says clustered mode seeds "Compiler" and "OpenVoxDB" groups
+for them. That seed runs inside Settings → Cluster → **Save**, and Save
+refuses clustered mode on SQLite with a 400 — Postgres for the GUI's own
+database is phase 3. It is also why this lab seeds `cluster_config.json`
+as a file: on SQLite, nothing else can put the GUI into clustered mode.)
+
 What happened: the agent asked `compiler01` for a catalog, puppetserver
 ran `/usr/local/bin/enc.py agent01.example.com`, the script asked the
 console's `/api/enc/classify/agent01.example.com/yaml`, and the class
@@ -229,7 +236,9 @@ target sees until the console has reported its key.
   `docs/CLUSTERED_SHARED_DB.txt`, and PostgreSQL for the GUI's own database
   (it runs on SQLite here). Phase 3 — the runbook was written from a week
   of field failures, which is exactly what a lab should be able to reproduce
-  on purpose.
+  on purpose. Until then the GUI's own Settings → Cluster → Save is off
+  limits (it refuses clustered mode on SQLite), and with it the ENC
+  infrastructure groups that Save seeds.
 
 ## Layout
 
