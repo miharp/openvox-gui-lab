@@ -115,8 +115,9 @@ compiler, agent); it is also the way to apply any change you deploy.
   are derived from the same `console_certnames` list that opens the
   status endpoints. `enc.py` answers with an empty classification when no
   console responds, so this is on from the compiler's first run: until
-  the console exists, compiles wait out one request timeout and nodes get
-  only what `site.pp` gives them.
+  the console exists, nodes get only what `site.pp` gives them (and each
+  compile waits out one ten-second timeout while the console host is
+  unreachable, none once it merely refuses).
 - **Every target** — `profile::bolt_target`. Wraps
   `openvox_gui::bolt_target` and adds the sudoers rule the module leaves to
   the operator.
@@ -171,9 +172,10 @@ vagrant ssh console -c 'curl -sk https://localhost:4567/api/enc/classify/agent01
 ```
 
 Stop the GUI (`vagrant ssh console -c 'sudo systemctl stop openvox-gui'`)
-and converge again: the run still succeeds, ten seconds slower, and the
-marker stays — the ENC returns an empty classification, and Puppet
-leaves an unmanaged file alone.
+and converge again: the run still succeeds and the marker stays — the
+ENC returns an empty classification, and Puppet leaves an unmanaged file
+alone. A stopped service refuses instantly; only an unreachable console
+*host* costs each compile the script's ten-second timeout.
 
 ### Member health by FQDN, not VIP
 
