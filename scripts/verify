@@ -54,9 +54,9 @@ echo "== bolt"
 # run through the GUI's own API — the inventory, user, key and tmpdir it uses
 # are the ones under test, not a hand-built bolt invocation.
 on console "sudo /opt/openvox-gui/scripts/seed-bolt-known-hosts.sh >/dev/null 2>&1" || true
-bolt=$(on console "curl -sk $auth -H 'Content-Type: application/json' -X POST $GUI/api/bolt/run/command -d '{\"command\":\"sudo -n true\",\"targets\":\"compiler01.example.com,agent01.example.com,console.example.com\"}'")
+bolt=$(on console "curl -sk $auth -H 'Content-Type: application/json' -X POST $GUI/api/bolt/run/command -d '{\"command\":\"sudo -n true\",\"targets\":\"puppet.example.com,compiler01.example.com,agent01.example.com,console.example.com\"}'")
 rc=$(printf '%s' "$bolt" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("returncode","?"))' 2>/dev/null)
-if [ "$rc" = 0 ] && [[ "$bolt" == *"Successful on 3 targets"* ]]; then ok "GUI runs a privileged command on every target via Bolt"; else bad "GUI bolt run (rc=${rc:-?}): $(printf '%s' "$bolt" | cut -c1-300)"; fi
+if [ "$rc" = 0 ] && [[ "$bolt" == *"Successful on 4 targets"* ]]; then ok "GUI runs a privileged command on every target via Bolt"; else bad "GUI bolt run (rc=${rc:-?}): $(printf '%s' "$bolt" | cut -c1-300)"; fi
 
 echo "== preflight"
 pre=$(on console "sudo /opt/openvox-gui/scripts/cluster-preflight.sh 2>&1 | tail -4")
