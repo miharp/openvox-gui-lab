@@ -38,6 +38,46 @@ module-ecosystem gaps surface as failures that look like GUI problems.
 | `console` | 192.168.58.12 | OpenVox GUI, OpenBolt, bolt user | `compiler01` / `puppet` |
 | `agent01` | 192.168.58.13 | agent, bolt user | `compiler01` / `puppet` |
 
+```mermaid
+flowchart TB
+    subgraph console["console.example.com"]
+        GUI["OpenVox GUI :4567<br/>OpenBolt · agent"]
+    end
+
+    subgraph compiler["compiler01.example.com"]
+        PS["puppetserver :8140<br/>enc.py · r10k"]
+    end
+
+    subgraph primary["puppet.example.com &nbsp;·&nbsp; the primary"]
+        CA["CA :8140"]
+        PDB["OpenVoxDB :8081"]
+        PG["PostgreSQL :5432<br/>puppetdb + openvox_gui"]
+        DNS["dnsmasq :53<br/>ovca / ovdb → this host"]
+    end
+
+    AG["agent01.example.com"]
+
+    GUI -- "server: catalogs, environments,<br/>/status, /metrics" --> PS
+    GUI == "Bolt as bolt@ (SSH + sudo):<br/>Stage/Activate, commands, files" ==> PS
+    GUI == "Bolt" ==> AG
+    GUI -- "certificates: ovca.example.com<br/>CA HTTP API, agent cert" --> CA
+    GUI -- "fleet: ovdb.example.com" --> PDB
+    GUI -- "its own database" --> PG
+    PS -. "external_nodes: enc.py<br/>GET /api/enc/classify" .-> GUI
+
+    AG -- "catalogs, reports" --> PS
+    PS -- "facts, catalogs, reports" --> PDB
+    PS -- "CA" --> CA
+    AG -- "CA" --> CA
+    PDB --- PG
+```
+
+Solid lines are HTTPS with Puppet certificates; heavy lines are Bolt over
+SSH (it reaches every node, the primary and the console itself included);
+the dotted line is the compiler asking the console for classification at
+compile time. The console's own agent uses the compiler like `agent01`
+does. Every node resolves through the primary's dnsmasq.
+
 Two names exist only in DNS, because the GUI treats them specially:
 `ovdb.example.com` (OpenVoxDB) and `ovca.example.com` (CA), both resolving to
 the primary. The console is configured with those names, they are seeded into
