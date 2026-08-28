@@ -46,7 +46,7 @@ openvoxdb::manage_firewall: false
 openvoxdb::ssl_listen_address: '0.0.0.0'
 # PostgreSQL itself listens on the network too: the GUI's database lives in
 # this instance and the console connects to it directly.
-openvoxdb::database_listen_address: '*'
+openvoxdb::database_listen_address: '0.0.0.0'
 # The package default (-Xmx256m) is tight once the GUI starts querying.
 openvoxdb::java_args:
   '-Xmx': '512m'
