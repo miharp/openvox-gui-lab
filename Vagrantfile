@@ -334,9 +334,11 @@ EOF
       firewall-cmd --add-port=4567/tcp --permanent >/dev/null
       firewall-cmd --reload >/dev/null
 
-      # First run: enrol, build the frontend, run the installer. Second run:
-      # this node has now reported its Bolt public key, so it becomes its own
-      # orchestration target, and the cluster config is seeded.
+      # First run: enrol, build the frontend, run the installer (which
+      # provisions the GUI's database on the primary), then put the GUI into
+      # clustered mode through its own API. Second run: this node has now
+      # reported its Bolt public key, so it becomes its own orchestration
+      # target.
       /opt/puppetlabs/bin/puppet agent -t --waitforlock 60 || true
       /opt/puppetlabs/bin/puppet agent -t --waitforlock 60 || true
       systemctl disable --now puppet 2>/dev/null || true

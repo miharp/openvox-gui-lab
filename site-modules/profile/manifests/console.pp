@@ -10,10 +10,12 @@
 # and SSH key; the key's public half is then reported as a fact and every
 # target, this node included, collects it (profile::bolt_target).
 #
-# Cluster mode is seeded once from here (deployment_mode clustered, the
-# compiler, OpenVoxDB and CA members, the round-robin names to hide from
-# the fleet) so Settings > Cluster is already filled in on first login.
-# The GUI owns the file afterwards; Puppet never rewrites it.
+# Cluster mode is set once from here, through the GUI's own Settings >
+# Cluster > Save (deployment_mode clustered, the compiler, OpenVoxDB and CA
+# members, the round-robin names to hide from the fleet), so that what an
+# operator's Save does - seeding the ENC infrastructure groups, running
+# the migration helpers - happens here too. The GUI owns the result
+# afterwards; Puppet only steps in while the GUI is not yet clustered.
 #
 # The GUI's own database is PostgreSQL on the primary, reached as
 # ovdb.example.com: clustered mode requires it (Settings > Cluster refuses
@@ -94,24 +96,54 @@ class profile::console (
   }
 
   $cluster = {
-    'deployment_mode'     => 'clustered',
-    'compilers'           => [$compiler],
-    'code_deploy_targets' => [$compiler],
-    'puppetdb_nodes'      => $puppetdb_nodes,
-    'ca_nodes'            => $ca_nodes,
-    'ca_vips'             => [$ca_host],
-    'dns_rr_vips'         => [$puppetdb_host],
-    'consoles'            => [$facts['networking']['fqdn']],
-    'database_backend'    => 'postgresql',
+    'deployment_mode'             => 'clustered',
+    'compilers'                   => [$compiler],
+    'code_deploy_targets'         => [$compiler],
+    'puppetdb_nodes'              => $puppetdb_nodes,
+    'ca_nodes'                    => $ca_nodes,
+    'ca_vips'                     => [$ca_host],
+    'dns_rr_vips'                 => [$puppetdb_host],
+    'consoles'                    => [$facts['networking']['fqdn']],
+    'database_backend'            => 'postgresql',
+    'seed_infrastructure_groups'  => true,
   }
 
-  file { '/opt/openvox-gui/data/cluster_config.json':
+  $seed = '/usr/local/sbin/openvox-gui-seed-cluster'
+  $seed_payload = '/opt/openvox-gui/config/cluster-seed.json'
+  $seed_login = '/opt/openvox-gui/config/cluster-seed-login.json'
+  $cluster_config = '/opt/openvox-gui/data/cluster_config.json'
+
+  file { $seed_payload:
     ensure  => file,
-    owner   => 'puppet',
-    group   => 'puppet',
-    mode    => '0640',
-    replace => false,
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0600',
     content => stdlib::to_json_pretty($cluster),
-    require => Class['openvox_gui'],
+  }
+
+  file { $seed_login:
+    ensure  => file,
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0600',
+    content => stdlib::to_json({ 'username' => 'admin', 'password' => $admin_password }),
+  }
+
+  file { $seed:
+    ensure => file,
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0755',
+    source => 'puppet:///modules/profile/openvox-gui-seed-cluster',
+  }
+
+  # Runs while the GUI is not yet clustered; afterwards the GUI owns the file.
+  $is_clustered = "import json, sys; sys.exit(0 if json.load(open('${cluster_config}')).get('deployment_mode') == 'clustered' else 1)"
+
+  exec { 'openvox-gui seed cluster':
+    command   => "${seed} ${seed_login} ${seed_payload}",
+    unless    => "/usr/bin/python3 -c \"${is_clustered}\"",
+    logoutput => true,
+    require   => [Class['openvox_gui'], File[$seed, $seed_login, $seed_payload]],
   }
 }

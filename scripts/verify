@@ -44,6 +44,16 @@ def walk(o,path=""):
         for v in o: walk(v,path)
 walk(d)' 2>/dev/null || bad "cluster/health unparseable: $chealth"
 
+echo "== database"
+# The GUI's own database: Postgres on the primary, provisioned by the
+# installer, and what Settings > Cluster reports.
+dburl=$(on console "sudo grep -E '^OPENVOX_GUI_DATABASE_URL=' /opt/openvox-gui/config/.env | sed 's/:[^:@]*@/:***@/'")
+[[ "$dburl" == *"postgresql+asyncpg://openvox_gui:"*"@ovdb.example.com:5432/openvox_gui" ]] && ok "$dburl" || bad "DATABASE_URL: ${dburl:-unset}"
+backend=$(printf '%s' "$cluster" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("database_backend",""))' 2>/dev/null)
+[ "$backend" = postgresql ] && ok "cluster database_backend=postgresql" || bad "cluster database_backend=${backend:-?}"
+tables=$(on puppet "sudo -u postgres psql -d openvox_gui -Atc \"select count(*) from pg_tables where schemaname='public' and tableowner='openvox_gui'\"")
+[ "${tables:-0}" -gt 0 ] 2>/dev/null && ok "openvox_gui on the primary: $tables tables owned by openvox_gui" || bad "openvox_gui tables on the primary: ${tables:-none}"
+
 echo "== fleet"
 gui_nodes=$(on console "curl -sk $auth $GUI/api/nodes/" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null)
 pdb_nodes=$(on puppet "sudo curl -sk --cert /etc/puppetlabs/puppet/ssl/certs/puppet.example.com.pem --key /etc/puppetlabs/puppet/ssl/private_keys/puppet.example.com.pem --cacert /etc/puppetlabs/puppet/ssl/certs/ca.pem https://localhost:8081/pdb/query/v4/nodes" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null)
@@ -71,6 +81,10 @@ from_console=$(on console "curl -sk $GUI/api/enc/classify/agent01.example.com/ya
 if [[ "$from_compiler" == *"ENC API"* || "$from_compiler" == *"Error"* ]]; then bad "enc.py on the compiler: $(printf '%s' "$from_compiler" | head -2 | tr '\n' ' ')"
 elif [ -n "$from_compiler" ] && [ "$(printf '%s' "$from_compiler" | tr -d '[:space:]')" = "$(printf '%s' "$from_console" | tr -d '[:space:]')" ]; then ok "enc.py on the compiler answers what the console answers for agent01"
 else bad "enc.py vs console for agent01: [$from_compiler] vs [$from_console]"; fi
+
+# Settings > Cluster > Save seeds these; the lab drives that Save.
+groups=$(on console "curl -sk $auth $GUI/api/enc/groups" | python3 -c 'import json,sys; print(" ".join(sorted(g["name"].replace(" ","_") for g in json.load(sys.stdin))))' 2>/dev/null)
+[[ "$groups" == *OpenVox_Compiler* && "$groups" == *OpenVoxDB* ]] && ok "ENC infrastructure groups seeded: $groups" || bad "ENC infrastructure groups: ${groups:-none}"
 
 echo "== preflight"
 pre=$(on console "sudo /opt/openvox-gui/scripts/cluster-preflight.sh 2>&1 | tail -4")

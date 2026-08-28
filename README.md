@@ -33,7 +33,7 @@ module-ecosystem gaps surface as failures that look like GUI problems.
 
 | node | IP | runs | `server` / `ca_server` |
 |---|---|---|---|
-| `puppet` | 192.168.58.10 | CA, OpenVoxDB + PostgreSQL, dnsmasq, r10k, bolt user | itself |
+| `puppet` | 192.168.58.10 | CA, OpenVoxDB + PostgreSQL (also the GUI's own database), dnsmasq, r10k, bolt user | itself |
 | `compiler01` | 192.168.58.11 | catalog compiler, r10k, bolt user | `puppet` / `puppet` |
 | `console` | 192.168.58.12 | OpenVox GUI, OpenBolt, bolt user | `compiler01` / `puppet` |
 | `agent01` | 192.168.58.13 | agent, bolt user | `compiler01` / `puppet` |
@@ -79,7 +79,8 @@ Then:
 and open <https://console.example.com:4567> (add `192.168.58.12
 console.example.com` to your host's `/etc/hosts`, or use the IP). Log in as
 `admin` with the password in `data/common.yaml`. Settings → Cluster is already
-filled in.
+filled in — saved through the GUI's own API during the console's build, so
+the ENC groups that Save seeds (`OpenVox Compiler`, `OpenVoxDB`) exist too.
 
 **Why `converge` after `up`:** the compiler enrols before the console exists.
 Its bolt user is created from the console's public key, collected from
@@ -97,9 +98,16 @@ compiler, agent); it is also the way to apply any change you deploy.
   [miharp/openvox_gui](https://github.com/miharp/puppet-openvox_gui) module:
   `puppet_server_host` is the compiler, `puppetdb_host` is `ovdb.example.com`,
   `PUPPET_CA_HOST` is `ovca.example.com`. `configure_bolt` creates the
-  console's bolt user and SSH key. Seeds `cluster_config.json` once
-  (`replace => false`); the GUI owns it afterwards.
-- **Primary** — `profile::primary`. OpenVoxDB with the EL9 PostgreSQL. Its
+  console's bolt user and SSH key. The GUI's own database is PostgreSQL on
+  the primary (`OPENVOX_GUI_DB_BACKEND`): the installer provisions role,
+  database and schema itself with its `bootstrap-openvox-gui-db.sh`,
+  connecting as a superuser the primary carries for that purpose. Cluster
+  mode is set once by driving Settings → Cluster → Save
+  (`openvox-gui-seed-cluster`, `PUT /api/config/cluster`) while the GUI is
+  not yet clustered; the GUI owns the result afterwards.
+- **Primary** — `profile::primary`. OpenVoxDB with the EL9 PostgreSQL, which
+  also holds the GUI's `openvox_gui` database (the runbook's layout: one
+  instance, two databases) and listens on the network for it. Its
   certificate carries `ovca`/`ovdb` SANs (set during provisioning) so the CA
   API and OpenVoxDB can be reached by those names. auth.conf rules allow the
   console's certname on the CA API (`certificate_status` and friends) — the
@@ -160,12 +168,10 @@ it. Then:
 vagrant ssh agent01 -c 'cat /etc/openvox-gui-lab-enc-marker'
 ```
 
-(`compiler01` and `puppet` show as *Unclassified* here, although the
-page's banner says clustered mode seeds "Compiler" and "OpenVoxDB" groups
-for them. That seed runs inside Settings → Cluster → **Save**, and Save
-refuses clustered mode on SQLite with a 400 — Postgres for the GUI's own
-database is phase 3. It is also why this lab seeds `cluster_config.json`
-as a file: on SQLite, nothing else can put the GUI into clustered mode.)
+`compiler01` and `puppet` are already classified, into the `OpenVox
+Compiler` and `OpenVoxDB` groups that Settings → Cluster → Save seeds.
+(Save refuses clustered mode on SQLite; the GUI's own database being
+PostgreSQL is what makes it, and this whole page, work.)
 
 What happened: the agent asked `compiler01` for a catalog, puppetserver
 ran `/usr/local/bin/enc.py agent01.example.com`, the script asked the
@@ -233,12 +239,11 @@ target sees until the console has reported its key.
   two compilers. The rest of phase 2 (the GUI's classifier on the compiler
   was the first half).
 - **A second OpenVoxDB and the two Spock meshes** from
-  `docs/CLUSTERED_SHARED_DB.txt`, and PostgreSQL for the GUI's own database
-  (it runs on SQLite here). Phase 3 — the runbook was written from a week
-  of field failures, which is exactly what a lab should be able to reproduce
-  on purpose. Until then the GUI's own Settings → Cluster → Save is off
-  limits (it refuses clustered mode on SQLite), and with it the ENC
-  infrastructure groups that Save seeds.
+  `docs/CLUSTERED_SHARED_DB.txt`. The GUI's own database is already
+  PostgreSQL (the first half of phase 3); replicating it and OpenVoxDB
+  across sites is the rest — the runbook was written from a week of field
+  failures, which is exactly what a lab should be able to reproduce on
+  purpose.
 
 ## Layout
 
@@ -247,9 +252,9 @@ target sees until the console has reported its key.
 | `Vagrantfile` | the four nodes, DNS, and their provisioning |
 | `Puppetfile` | component modules, including `openvox_gui` pinned by tag |
 | `manifests/site.pp` | node definitions; keep in step with onceover |
-| `data/` | Hiera; versions, credentials, OpenVoxDB settings |
+| `data/` | Hiera; versions, credentials, OpenVoxDB and PostgreSQL settings |
 | `site-modules/profile/` | `base`, `openvox_agent`, `openvox_server`, `primary`, `compiler`, `console`, `bolt_target`, `enc_marker` (assigned from the GUI only) |
 | `site-modules/role/` | `primary`, `compiler`, `console`, `agent` |
 | `scripts/converge` | run the agent on every node, in order |
-| `scripts/verify` | GUI health, login, cluster mode, member health, fleet count, Bolt, ENC, preflight |
+| `scripts/verify` | GUI health, login, cluster mode, member health, database, fleet count, Bolt, ENC, preflight |
 | `scripts/deploy` | r10k on both servers, out of band |

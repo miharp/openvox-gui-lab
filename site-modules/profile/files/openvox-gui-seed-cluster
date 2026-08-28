@@ -1,0 +1,27 @@
+#!/bin/bash
+# Put the local OpenVox GUI into clustered mode the way an operator does:
+# through Settings > Cluster > Save (PUT /api/config/cluster), which also
+# seeds the ENC infrastructure groups and runs the GUI's own migration
+# helpers. Managed by Puppet (profile::console).
+#
+#   openvox-gui-seed-cluster <login.json> <cluster.json> [url]
+set -euo pipefail
+login=$1; payload=$2; url=${3:-https://localhost:4567}
+
+for _ in $(seq 1 30); do
+  curl -skf "$url/health" >/dev/null 2>&1 && break
+  sleep 2
+done
+
+token=$(curl -sk -X POST "$url/api/auth/login" -H 'Content-Type: application/json' -d @"$login" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')
+[ -n "$token" ] || { echo "openvox-gui-seed-cluster: login failed" >&2; exit 1; }
+
+out=$(mktemp); trap 'rm -f "$out"' EXIT
+code=$(curl -sk -o "$out" -w '%{http_code}' -X PUT "$url/api/config/cluster" \
+  -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d @"$payload")
+if [ "$code" != 200 ]; then
+  echo "openvox-gui-seed-cluster: PUT /api/config/cluster returned $code: $(cut -c1-400 "$out")" >&2
+  exit 1
+fi
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("openvox-gui-seed-cluster: mode", d["config"]["deployment_mode"], "seeded", d.get("seeded_groups"))' "$out"
