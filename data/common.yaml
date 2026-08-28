@@ -10,7 +10,7 @@ profile::openvox_server::version: '8.15.2'
 # below the backend's floor, and only 3.12.1-dev.1+ honours PYTHON_BIN
 # (cvquesty/openvox-gui#42). It is also the train the fixes for the
 # dedicated-console installer bugs (#44, #45) land on.
-profile::console::gui_version: '3.12.1-dev.3'
+profile::console::gui_version: '3.12.1-dev.10'
 
 # Lab credentials, in plain YAML on purpose: there is nothing here worth
 # protecting, and eyaml would put PKCS7 keys between you and `vagrant up`.
