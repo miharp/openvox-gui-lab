@@ -137,7 +137,14 @@ EOF
     # the path is trusted; the synced mount is owned by the host user.
     git config --global --add safe.directory /vagrant-src
     git config --global --add safe.directory /vagrant-src/.git
-    /opt/puppetlabs/puppet/bin/r10k deploy environment -v -p
+    # The Forge occasionally resets connections mid-deploy on a fresh box;
+    # a second or third attempt has always been enough.
+    for attempt in 1 2 3; do
+      /opt/puppetlabs/puppet/bin/r10k deploy environment -v -p && break
+      [ "$attempt" -lt 3 ] || { echo "r10k deploy failed 3 times" >&2; exit 1; }
+      echo "r10k deploy attempt $attempt failed; retrying in 15s" >&2
+      sleep 15
+    done
   SHELL
 
   # ---------------------------------------------------------------- primary ----
