@@ -33,7 +33,7 @@ module-ecosystem gaps surface as failures that look like GUI problems.
 
 | node | IP | runs | `server` / `ca_server` |
 |---|---|---|---|
-| `puppet` | 192.168.58.10 | CA, OpenVoxDB + PostgreSQL, dnsmasq, r10k | itself |
+| `puppet` | 192.168.58.10 | CA, OpenVoxDB + PostgreSQL, dnsmasq, r10k, bolt user | itself |
 | `compiler01` | 192.168.58.11 | catalog compiler, r10k, bolt user | `puppet` / `puppet` |
 | `console` | 192.168.58.12 | OpenVox GUI, OpenBolt, bolt user | `compiler01` / `puppet` |
 | `agent01` | 192.168.58.13 | agent, bolt user | `compiler01` / `puppet` |
