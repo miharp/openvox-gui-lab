@@ -109,7 +109,14 @@ compiler, agent); it is also the way to apply any change you deploy.
 - **Compiler** — `profile::compiler`. OpenVoxDB termini pointed at
   `ovdb.example.com` (the GUI's fleet follows OpenVoxDB: a compiler not
   wired to it hides every node it serves), r10k and an `r10k.yaml` because
-  Stage/Activate runs r10k *here*, over Bolt.
+  Stage/Activate runs r10k *here*, over Bolt, and the GUI's classifier
+  (`openvox_gui::enc`): puppetserver runs `enc.py` at compile time, which
+  asks the console at `https://console.example.com:4567`. The console URLs
+  are derived from the same `console_certnames` list that opens the
+  status endpoints. `enc.py` answers with an empty classification when no
+  console responds, so this is on from the compiler's first run: until
+  the console exists, compiles wait out one request timeout and nodes get
+  only what `site.pp` gives them.
 - **Every target** — `profile::bolt_target`. Wraps
   `openvox_gui::bolt_target` and adds the sudoers rule the module leaves to
   the operator.
@@ -138,6 +145,35 @@ vagrant ssh agent01 -c 'cat /etc/openvox-gui-lab-marker'
 
 Nodes → pick `agent01` → Run Command → `sudo systemctl status puppet`. It
 goes console → `bolt@agent01` → sudoers rule from `profile::bolt_target`.
+
+### Classify a node from the GUI
+
+`profile::enc_marker` is declared nowhere in this repository; it exists
+to be handed out by the GUI. Classification & Code → Classification →
+create a group (environment `production`) with class `profile::enc_marker`
+and, if you like, parameter `content`, and add `agent01.example.com` to
+it. Then:
+
+```console
+./scripts/converge agent01
+vagrant ssh agent01 -c 'cat /etc/openvox-gui-lab-enc-marker'
+```
+
+What happened: the agent asked `compiler01` for a catalog, puppetserver
+ran `/usr/local/bin/enc.py agent01.example.com`, the script asked the
+console's `/api/enc/classify/agent01.example.com/yaml`, and the class
+and parameter came back merged with what `site.pp` declares. The same
+YAML, straight from either end:
+
+```console
+vagrant ssh compiler01 -c 'sudo sh -c "set -a; . /etc/sysconfig/openvox-enc; /usr/local/bin/enc.py agent01.example.com"'
+vagrant ssh console -c 'curl -sk https://localhost:4567/api/enc/classify/agent01.example.com/yaml'
+```
+
+Stop the GUI (`vagrant ssh console -c 'sudo systemctl stop openvox-gui'`)
+and converge again: the run still succeeds, ten seconds slower, and the
+marker stays — the ENC returns an empty classification, and Puppet
+leaves an unmanaged file alone.
 
 ### Member health by FQDN, not VIP
 
@@ -182,15 +218,11 @@ target sees until the console has reported its key.
 
 ## What is deliberately not here (yet)
 
-- **ENC on the compiler.** The GUI's classifier (`enc.py`) runs on compilers
-  and calls the console's API at compile time. Wiring it before the console
-  exists breaks every compile, so phase 1 classifies from `site.pp`. Phase 2
-  adds it through `bootstrap-compiler-enc.sh` once bring-up ordering is
-  handled.
 - **An HAProxy compiler frontend** (`ovcompilers.example.com`) and a second
   compiler. The GUI has specific rules for that name (it *is* a node, unlike
   the round-robin names) and coordinated cutover only means something with
-  two compilers. Phase 2.
+  two compilers. The rest of phase 2 (the GUI's classifier on the compiler
+  was the first half).
 - **A second OpenVoxDB and the two Spock meshes** from
   `docs/CLUSTERED_SHARED_DB.txt`, and PostgreSQL for the GUI's own database
   (it runs on SQLite here). Phase 3 — the runbook was written from a week
@@ -205,8 +237,8 @@ target sees until the console has reported its key.
 | `Puppetfile` | component modules, including `openvox_gui` pinned by tag |
 | `manifests/site.pp` | node definitions; keep in step with onceover |
 | `data/` | Hiera; versions, credentials, OpenVoxDB settings |
-| `site-modules/profile/` | `base`, `openvox_agent`, `openvox_server`, `primary`, `compiler`, `console`, `bolt_target` |
+| `site-modules/profile/` | `base`, `openvox_agent`, `openvox_server`, `primary`, `compiler`, `console`, `bolt_target`, `enc_marker` (assigned from the GUI only) |
 | `site-modules/role/` | `primary`, `compiler`, `console`, `agent` |
 | `scripts/converge` | run the agent on every node, in order |
-| `scripts/verify` | GUI health, login, cluster mode, member health, fleet count, Bolt, preflight |
+| `scripts/verify` | GUI health, login, cluster mode, member health, fleet count, Bolt, ENC, preflight |
 | `scripts/deploy` | r10k on both servers, out of band |

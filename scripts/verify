@@ -58,6 +58,20 @@ bolt=$(on console "curl -sk $auth -H 'Content-Type: application/json' -X POST $G
 rc=$(printf '%s' "$bolt" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("returncode","?"))' 2>/dev/null)
 if [ "$rc" = 0 ] && [[ "$bolt" == *"Successful on 4 targets"* ]]; then ok "GUI runs a privileged command on every target via Bolt"; else bad "GUI bolt run (rc=${rc:-?}): $(printf '%s' "$bolt" | cut -c1-300)"; fi
 
+echo "== enc"
+# The compiler must ask the console, and get the same answer the console
+# gives directly. enc.py hides a failed request behind an empty
+# classification, so its stderr is checked as well as its output.
+conf=$(on compiler01 "sudo grep -E '^\s*(node_terminus|external_nodes)' /etc/puppetlabs/puppet/puppet.conf | tr -s ' \n' ' '")
+[[ "$conf" == *"node_terminus = exec"* && "$conf" == *"external_nodes = /usr/local/bin/enc.py"* ]] && ok "compiler puppet.conf: $conf" || bad "compiler puppet.conf: ${conf:-no ENC settings}"
+envfiles=$(on compiler01 "systemctl show -p EnvironmentFiles puppetserver")
+[[ "$envfiles" == *"/etc/sysconfig/openvox-enc"* ]] && ok "puppetserver loads /etc/sysconfig/openvox-enc" || bad "puppetserver EnvironmentFiles: ${envfiles:-?}"
+from_compiler=$(on compiler01 "sudo sh -c 'set -a; . /etc/sysconfig/openvox-enc; exec /usr/local/bin/enc.py agent01.example.com' 2>&1")
+from_console=$(on console "curl -sk $GUI/api/enc/classify/agent01.example.com/yaml")
+if [[ "$from_compiler" == *"ENC API"* || "$from_compiler" == *"Error"* ]]; then bad "enc.py on the compiler: $(printf '%s' "$from_compiler" | head -2 | tr '\n' ' ')"
+elif [ -n "$from_compiler" ] && [ "$(printf '%s' "$from_compiler" | tr -d '[:space:]')" = "$(printf '%s' "$from_console" | tr -d '[:space:]')" ]; then ok "enc.py on the compiler answers what the console answers for agent01"
+else bad "enc.py vs console for agent01: [$from_compiler] vs [$from_console]"; fi
+
 echo "== preflight"
 pre=$(on console "sudo /opt/openvox-gui/scripts/cluster-preflight.sh 2>&1 | tail -4")
 [[ "$pre" == *"result: PASS"* || "$pre" == *"OK"* && "$pre" != *"FAIL"* ]] && ok "cluster-preflight" || bad "cluster-preflight: $pre"

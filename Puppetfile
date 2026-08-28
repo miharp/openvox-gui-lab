@@ -26,8 +26,9 @@ mod 'puppetlabs/puppet_authorization', '1.0.1'
 # compile-only environment (Onceover) has to declare it.
 mod 'puppetlabs/yumrepo_core', '3.0.1'
 
-# Not on the Forge; pinned by tag. Installs the GUI on the console and
-# prepares Bolt targets (openvox_gui::bolt_target) everywhere else.
+# Not on the Forge; pinned by tag. Installs the GUI on the console, prepares
+# Bolt targets (openvox_gui::bolt_target) everywhere else, and wires the
+# compiler to the GUI's classifier (openvox_gui::enc).
 mod 'openvox_gui',
   git: 'https://github.com/miharp/puppet-openvox_gui.git',
-  ref: 'v0.2.0'
+  ref: 'v0.3.0'

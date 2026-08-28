@@ -7,18 +7,37 @@
 # Stage/Activate runs r10k here, over Bolt, as root. The bolt user itself
 # comes from profile::bolt_target once the console has reported its key.
 #
+# Classification from the GUI happens here too: puppetserver runs the GUI's
+# enc.py at compile time, which asks the console. Every console allowed on
+# this server's status endpoints (profile::openvox_server::console_certnames)
+# is one the classifier may ask. enc.py answers with an empty classification
+# when no console responds, so the compiler carries this from its first run,
+# before the console exists; until then each compile waits out the request
+# timeout, and site.pp's classification is all a node gets.
+#
 # @param puppetdb_server
 #   OpenVoxDB host the termini talk to.
 # @param control_repo_remote
 #   Git remote r10k deploys from. The default is the read-only synced copy
 #   of this repository's own .git.
+# @param console_port
+#   Port the console(s) serve the GUI on.
 class profile::compiler (
   Stdlib::Host $puppetdb_server = 'ovdb.example.com',
   String[1] $control_repo_remote = 'file:///vagrant-src/.git',
+  Stdlib::Port $console_port = 4567,
 ) {
   include profile::base
   include profile::openvox_server
   include profile::bolt_target
+
+  $consoles = $profile::openvox_server::console_certnames
+  unless $consoles.empty {
+    class { 'openvox_gui::enc':
+      api_base => $consoles.map |$c| { "https://${c}:${console_port}" },
+      require  => Package['openvox-server'],
+    }
+  }
 
   class { 'openvoxdb::master::config':
     puppetdb_server         => $puppetdb_server,

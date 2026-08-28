@@ -8,6 +8,8 @@ classes:
   - role::compiler
   - role::console
   - role::agent
+  # Only ever assigned from the GUI; compiled here so it is known to be valid.
+  - profile::enc_marker
 
 nodes:
   - puppet.example.com
@@ -24,6 +26,7 @@ class_groups:
     - role::console
   agent_role:
     - role::agent
+    - profile::enc_marker
 
 node_groups:
   primary:
