@@ -128,7 +128,9 @@ OpenVoxDB through the `openvox_gui_bolt_pubkey` fact — and a node uploads
 its facts at the *start* of a run, so the key reaches OpenVoxDB during the
 console's run and the compiler can only see it on a run after that.
 `converge` runs the agent on every node in that order (primary, console,
-compiler, agent); it is also the way to apply any change you deploy.
+compiler, agent). The agent also runs as a service every 30 minutes
+(`profile::openvox_agent::runinterval`), so a deployed change lands on its
+own within that window; `converge` is for applying it now.
 
 ## How the pieces fit
 

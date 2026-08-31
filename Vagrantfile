@@ -239,10 +239,6 @@ EOF
         sleep 5
       done
       systemctl is-active puppetdb || { journalctl -u puppetdb --no-pager -n 30; exit 1; }
-
-      # The agent is left off on every node: this is a lab for watching
-      # specific things happen. scripts/converge runs it on demand.
-      systemctl disable --now puppet 2>/dev/null || true
     SHELL
   end
 
@@ -295,7 +291,6 @@ EOF
 
       systemctl enable --now puppetserver
       systemctl restart puppetserver
-      systemctl disable --now puppet 2>/dev/null || true
 
       # Do not return until puppetserver answers, or the console's first run
       # races a still-starting JVM.
@@ -348,7 +343,6 @@ EOF
       # target.
       /opt/puppetlabs/bin/puppet agent -t --waitforlock 60 || true
       /opt/puppetlabs/bin/puppet agent -t --waitforlock 60 || true
-      systemctl disable --now puppet 2>/dev/null || true
 
       for _ in $(seq 1 30); do
         curl -skf https://localhost:4567/health >/dev/null 2>&1 && break
@@ -383,7 +377,6 @@ EOF
       /opt/puppetlabs/bin/puppet config set --section main ca_server puppet.example.com
 
       /opt/puppetlabs/bin/puppet agent -t --waitforlock 60 || true
-      systemctl disable --now puppet 2>/dev/null || true
     SHELL
   end
 end

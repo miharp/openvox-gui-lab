@@ -1,8 +1,9 @@
 #!/bin/bash
 # Run the agent once on every node, in dependency order.
 #
-# The agent is left disabled on every node so nothing runs in the middle of
-# an observation. Bring-up leaves one known gap that this pass closes: the
+# The agent also runs as a service every 30 minutes (profile::openvox_agent);
+# this is for when you do not want to wait. Bring-up leaves one known gap
+# that this pass closes: the
 # compiler enrols before the console exists, so it gets its bolt user (the
 # console's key, collected from OpenVoxDB) only on a later run.
 #
