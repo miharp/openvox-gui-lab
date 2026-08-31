@@ -9,8 +9,8 @@ profile::openvox_server::version: '8.15.2'
 # The 3.12.1 dev train rather than 3.12.0: on EL9 the stock python3 is 3.9,
 # below the backend's floor, and only 3.12.1-dev.1+ honours PYTHON_BIN
 # (cvquesty/openvox-gui#42). It is also the train the fixes for the
-# dedicated-console installer bugs (#44, #45) land on.
-profile::console::gui_version: '3.12.1-dev.10'
+# dedicated-console bugs found here (#44, #45, #63, #64, #65) land on.
+profile::console::gui_version: '3.12.1-dev.13'
 
 # Lab credentials, in plain YAML on purpose: there is nothing here worth
 # protecting, and eyaml would put PKCS7 keys between you and `vagrant up`.
